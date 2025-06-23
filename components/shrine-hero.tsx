@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Flame, Check, Camera } from "lucide-react"
+import { Flame, Check, Camera, Loader2 } from "lucide-react"
+import { useCandleCount } from "@/hooks/use-candle-count"
 
 interface ShrineHeroProps {
   profileImage: string
@@ -12,31 +13,17 @@ interface ShrineHeroProps {
 }
 
 export default function ShrineHero({ profileImage, onProfileUpload, uploadStatus }: ShrineHeroProps) {
-  const [candleCount, setCandleCount] = useState(247)
+  const { candleCount, loading: candleLoading, updating, lightCandle } = useCandleCount()
   const [candleLit, setCandleLit] = useState(false)
   const [glowIntensity, setGlowIntensity] = useState(0)
+  const [showSuccess, setShowSuccess] = useState(false)
 
-  // Load candle count from localStorage
-  useEffect(() => {
-    const savedCount = localStorage.getItem("candleCount")
-    if (savedCount) {
-      setCandleCount(Number.parseInt(savedCount))
-    }
-  }, [])
-
-  // Save candle count to localStorage
-  useEffect(() => {
-    localStorage.setItem("candleCount", candleCount.toString())
-  }, [candleCount])
-
-  const lightCandle = () => {
-    if (candleLit) return
+  const handleLightCandle = async () => {
+    if (candleLit || updating) return
 
     setCandleLit(true)
-    const newCount = candleCount + 1
-    setCandleCount(newCount)
 
-    // Animate glow intensity
+    // Start glow animation
     let intensity = 0
     const glowInterval = setInterval(() => {
       intensity += 0.1
@@ -46,11 +33,15 @@ export default function ShrineHero({ profileImage, onProfileUpload, uploadStatus
       }
     }, 100)
 
-    // Store in localStorage (Firebase integration ready)
-    localStorage.setItem("candleCount", newCount.toString())
-    localStorage.setItem("lastCandleLit", new Date().toISOString())
+    // Call Firebase function
+    const success = await lightCandle()
 
-    // Reset after 10 seconds
+    if (success) {
+      setShowSuccess(true)
+      setTimeout(() => setShowSuccess(false), 2000)
+    }
+
+    // Reset animation after 10 seconds
     setTimeout(() => {
       setCandleLit(false)
       setGlowIntensity(0)
@@ -232,17 +223,43 @@ export default function ShrineHero({ profileImage, onProfileUpload, uploadStatus
         {/* Candle Lighting Section */}
         <div className="space-y-6">
           <Button
-            onClick={lightCandle}
-            disabled={candleLit}
+            onClick={handleLightCandle}
+            disabled={candleLit || updating || candleLoading}
             className="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full shadow-2xl border border-amber-400/50 transition-all duration-300 hover:scale-105 text-base sm:text-lg disabled:opacity-50"
           >
-            <Flame className="w-5 sm:w-6 h-5 sm:h-6 mr-2 sm:mr-3" />
-            {candleLit ? "Candle Lit" : "Light a Candle"}
+            {updating ? (
+              <>
+                <Loader2 className="w-5 sm:w-6 h-5 sm:h-6 mr-2 sm:mr-3 animate-spin" />
+                Lighting...
+              </>
+            ) : (
+              <>
+                <Flame className="w-5 sm:w-6 h-5 sm:h-6 mr-2 sm:mr-3" />
+                {candleLit ? "Candle Lit" : "Light a Candle"}
+              </>
+            )}
           </Button>
 
           <div className="space-y-2">
-            <p className="text-slate-200 text-lg sm:text-xl font-medium">{candleCount} candles lit in memory</p>
+            {candleLoading ? (
+              <div className="flex items-center justify-center space-x-2">
+                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                <p className="text-slate-400 text-sm">Loading candle count...</p>
+              </div>
+            ) : (
+              <p className="text-slate-200 text-lg sm:text-xl font-medium">{candleCount} candles lit in memory</p>
+            )}
           </div>
+
+          {/* Success Message */}
+          {showSuccess && (
+            <div className="bg-green-600/20 border border-green-500/50 rounded-lg p-3 max-w-sm mx-auto">
+              <p className="text-green-400 text-sm flex items-center justify-center">
+                <Check className="w-4 h-4 mr-2" />
+                Your candle has been lit in memory of Amaia
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="text-slate-100 text-lg sm:text-xl font-serif italic mt-8">"Remembering a life well lived"</div>

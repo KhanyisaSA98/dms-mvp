@@ -5,29 +5,41 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { X, Users, Heart, Star, TreePine } from "lucide-react"
+import { X, Users, Heart, Star, TreePine, Loader2, ChevronDown, ChevronRight } from "lucide-react"
+import { useFamilyTree, type FamilyMember } from "@/hooks/use-family-tree"
 
 interface FamilyTreeModalProps {
   onClose: () => void
 }
 
 export default function FamilyTreeModal({ onClose }: FamilyTreeModalProps) {
+  const { familyTree, loading } = useFamilyTree()
   const [animationPhase, setAnimationPhase] = useState(0)
+  const [expandedSections, setExpandedSections] = useState({
+    grandparents: true,
+    parents: true,
+    spouse: true,
+    children: true,
+    siblings: true,
+    customRelations: false,
+  })
 
   // Trigger animation phases
   useEffect(() => {
-    const timer1 = setTimeout(() => setAnimationPhase(1), 300)
-    const timer2 = setTimeout(() => setAnimationPhase(2), 800)
-    const timer3 = setTimeout(() => setAnimationPhase(3), 1300)
-    const timer4 = setTimeout(() => setAnimationPhase(4), 1800)
+    if (!loading) {
+      const timer1 = setTimeout(() => setAnimationPhase(1), 300)
+      const timer2 = setTimeout(() => setAnimationPhase(2), 800)
+      const timer3 = setTimeout(() => setAnimationPhase(3), 1300)
+      const timer4 = setTimeout(() => setAnimationPhase(4), 1800)
 
-    return () => {
-      clearTimeout(timer1)
-      clearTimeout(timer2)
-      clearTimeout(timer3)
-      clearTimeout(timer4)
+      return () => {
+        clearTimeout(timer1)
+        clearTimeout(timer2)
+        clearTimeout(timer3)
+        clearTimeout(timer4)
+      }
     }
-  }, [])
+  }, [loading])
 
   // Handle escape key and backdrop click
   useEffect(() => {
@@ -45,6 +57,88 @@ export default function FamilyTreeModal({ onClose }: FamilyTreeModalProps) {
     if (e.target === e.currentTarget) {
       onClose()
     }
+  }
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }))
+  }
+
+  const renderFamilyMember = (member: FamilyMember, index: number, delay = "") => (
+    <div
+      key={member.id}
+      className={`transition-all duration-700 ${delay} ${animationPhase >= 4 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+    >
+      <Card className="bg-slate-700/30 border-slate-500/40 w-full sm:w-48 max-w-sm mx-auto hover:bg-slate-700/40 transition-colors">
+        <CardContent className="p-4 sm:p-6 text-center">
+          <div className="w-12 sm:w-16 h-12 sm:h-16 bg-slate-500/20 rounded-full mx-auto mb-4 flex items-center justify-center">
+            {member.relationship.toLowerCase().includes("spouse") ||
+            member.relationship.toLowerCase().includes("husband") ||
+            member.relationship.toLowerCase().includes("wife") ? (
+              <Heart className="w-6 sm:w-8 h-6 sm:h-8 text-slate-400" />
+            ) : (
+              <Users className="w-6 sm:w-8 h-6 sm:h-8 text-slate-400" />
+            )}
+          </div>
+          <h4 className="text-slate-200 font-medium text-sm sm:text-base">{member.name}</h4>
+          <p className="text-slate-300 text-xs sm:text-sm">{member.relationship}</p>
+          {(member.birthYear || member.deathYear) && (
+            <p className="text-slate-400 text-xs">
+              {member.birthYear && `Born ${member.birthYear}`}
+              {member.birthYear && member.deathYear && " - "}
+              {member.deathYear && member.deathYear}
+            </p>
+          )}
+          {member.description && <p className="text-slate-400 text-xs mt-1">{member.description}</p>}
+        </CardContent>
+      </Card>
+    </div>
+  )
+
+  const renderSection = (
+    title: string,
+    members: FamilyMember[],
+    sectionKey: keyof typeof expandedSections,
+    animationCondition: boolean,
+  ) => {
+    if (members.length === 0) return null
+
+    return (
+      <div className="text-center">
+        <div className="flex items-center justify-center mb-6 sm:mb-8">
+          <Button
+            variant="ghost"
+            onClick={() => toggleSection(sectionKey)}
+            className="text-xl sm:text-2xl font-serif text-slate-300 hover:text-slate-200 flex items-center space-x-2"
+          >
+            {expandedSections[sectionKey] ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+            <span>{title}</span>
+            <span className="text-sm">({members.length})</span>
+          </Button>
+        </div>
+
+        {expandedSections[sectionKey] && (
+          <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-8 flex-wrap gap-4">
+            {members.map((member, index) =>
+              renderFamilyMember(member, index, index === 0 ? "delay-0" : index === 1 ? "delay-200" : "delay-400"),
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+        <div className="bg-slate-800/95 rounded-2xl p-8 flex flex-col items-center space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+          <p className="text-slate-300">Loading family tree...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -72,84 +166,28 @@ export default function FamilyTreeModal({ onClose }: FamilyTreeModalProps) {
         {/* Family Tree Content */}
         <div className="p-4 sm:p-8 space-y-8 sm:space-y-12">
           {/* Grandparents */}
-          <div className="text-center">
-            <h3 className="text-xl sm:text-2xl font-serif text-slate-300 mb-6 sm:mb-8">Grandparents</h3>
-            <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-16">
-              <div
-                className={`transition-all duration-700 ${animationPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-              >
-                <Card className="bg-slate-700/30 border-slate-500/40 w-full sm:w-48 max-w-sm mx-auto">
-                  <CardContent className="p-4 sm:p-6 text-center">
-                    <div className="w-12 sm:w-16 h-12 sm:h-16 bg-slate-500/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                      <Users className="w-6 sm:w-8 h-6 sm:h-8 text-slate-400" />
-                    </div>
-                    <h4 className="text-slate-200 font-medium">James Williams</h4>
-                    <p className="text-slate-300 text-sm">Grandfather (1910-1995)</p>
-                  </CardContent>
-                </Card>
-              </div>
-              <div
-                className={`transition-all duration-700 delay-200 ${animationPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-              >
-                <Card className="bg-slate-700/30 border-slate-500/40 w-full sm:w-48 max-w-sm mx-auto">
-                  <CardContent className="p-4 sm:p-6 text-center">
-                    <div className="w-12 sm:w-16 h-12 sm:h-16 bg-slate-500/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                      <Users className="w-6 sm:w-8 h-6 sm:h-8 text-slate-400" />
-                    </div>
-                    <h4 className="text-slate-200 font-medium">Rose Williams</h4>
-                    <p className="text-slate-300 text-sm">Grandmother (1915-1998)</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </div>
+          {renderSection("Grandparents", familyTree.grandparents, "grandparents", animationPhase >= 1)}
 
           {/* Connection Lines */}
-          <div className="flex justify-center">
-            <div
-              className={`w-px h-12 sm:h-16 bg-gradient-to-b from-slate-400 to-transparent transition-all duration-500 ${animationPhase >= 2 ? "opacity-100" : "opacity-0"}`}
-            ></div>
-          </div>
+          {familyTree.grandparents.length > 0 && familyTree.parents.length > 0 && (
+            <div className="flex justify-center">
+              <div
+                className={`w-px h-12 sm:h-16 bg-gradient-to-b from-slate-400 to-transparent transition-all duration-500 ${animationPhase >= 2 ? "opacity-100" : "opacity-0"}`}
+              ></div>
+            </div>
+          )}
 
           {/* Parents */}
-          <div className="text-center">
-            <h3 className="text-xl sm:text-2xl font-serif text-slate-300 mb-6 sm:mb-8">Parents</h3>
-            <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-16">
-              <div
-                className={`transition-all duration-700 ${animationPhase >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-              >
-                <Card className="bg-slate-700/30 border-slate-500/40 w-full sm:w-48 max-w-sm mx-auto">
-                  <CardContent className="p-4 sm:p-6 text-center">
-                    <div className="w-12 sm:w-16 h-12 sm:h-16 bg-slate-500/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                      <Users className="w-6 sm:w-8 h-6 sm:h-8 text-slate-400" />
-                    </div>
-                    <h4 className="text-slate-200 font-medium">John Williams</h4>
-                    <p className="text-slate-300 text-sm">Father (1935-2010)</p>
-                  </CardContent>
-                </Card>
-              </div>
-              <div
-                className={`transition-all duration-700 delay-200 ${animationPhase >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-              >
-                <Card className="bg-slate-700/30 border-slate-500/40 w-full sm:w-48 max-w-sm mx-auto">
-                  <CardContent className="p-4 sm:p-6 text-center">
-                    <div className="w-12 sm:w-16 h-12 sm:h-16 bg-slate-500/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                      <Users className="w-6 sm:w-8 h-6 sm:h-8 text-slate-400" />
-                    </div>
-                    <h4 className="text-slate-200 font-medium">Mary Williams</h4>
-                    <p className="text-slate-300 text-sm">Mother (1938-2015)</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </div>
+          {renderSection("Parents", familyTree.parents, "parents", animationPhase >= 2)}
 
           {/* Connection Lines */}
-          <div className="flex justify-center">
-            <div
-              className={`w-px h-12 sm:h-16 bg-gradient-to-b from-slate-400 to-transparent transition-all duration-500 ${animationPhase >= 3 ? "opacity-100" : "opacity-0"}`}
-            ></div>
-          </div>
+          {familyTree.parents.length > 0 && (
+            <div className="flex justify-center">
+              <div
+                className={`w-px h-12 sm:h-16 bg-gradient-to-b from-slate-400 to-transparent transition-all duration-500 ${animationPhase >= 3 ? "opacity-100" : "opacity-0"}`}
+              ></div>
+            </div>
+          )}
 
           {/* Amaia & Spouse (Center) */}
           <div className="text-center">
@@ -169,93 +207,69 @@ export default function FamilyTreeModal({ onClose }: FamilyTreeModalProps) {
                 </Card>
               </div>
 
-              <div
-                className={`transition-all duration-700 delay-300 ${animationPhase >= 3 ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"}`}
-              >
-                <div className="text-slate-400 text-3xl sm:text-4xl">💕</div>
-              </div>
+              {familyTree.spouse.length > 0 && (
+                <>
+                  <div
+                    className={`transition-all duration-700 delay-300 ${animationPhase >= 3 ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"}`}
+                  >
+                    <div className="text-slate-400 text-3xl sm:text-4xl">💕</div>
+                  </div>
 
-              <div
-                className={`transition-all duration-700 delay-500 ${animationPhase >= 3 ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"}`}
-              >
-                <Card className="bg-slate-700/30 border-slate-500/40 w-full sm:w-56 max-w-sm mx-auto">
-                  <CardContent className="p-4 sm:p-6 text-center">
-                    <div className="w-16 sm:w-20 h-16 sm:h-20 bg-slate-500/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                      <Heart className="w-8 sm:w-10 h-8 sm:h-10 text-slate-400" />
-                    </div>
-                    <h4 className="text-slate-200 font-medium text-lg sm:text-xl">David Johnson</h4>
-                    <p className="text-slate-300">Beloved Husband</p>
-                    <p className="text-slate-400 text-sm">(Married 1992)</p>
-                  </CardContent>
-                </Card>
-              </div>
+                  <div
+                    className={`transition-all duration-700 delay-500 ${animationPhase >= 3 ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"}`}
+                  >
+                    {familyTree.spouse.map((spouse) => (
+                      <Card
+                        key={spouse.id}
+                        className="bg-slate-700/30 border-slate-500/40 w-full sm:w-56 max-w-sm mx-auto"
+                      >
+                        <CardContent className="p-4 sm:p-6 text-center">
+                          <div className="w-16 sm:w-20 h-16 sm:h-20 bg-slate-500/20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                            <Heart className="w-8 sm:w-10 h-8 sm:h-10 text-slate-400" />
+                          </div>
+                          <h4 className="text-slate-200 font-medium text-lg sm:text-xl">{spouse.name}</h4>
+                          <p className="text-slate-300">{spouse.relationship}</p>
+                          {spouse.description && <p className="text-slate-400 text-sm">({spouse.description})</p>}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
           {/* Connection Lines */}
-          <div className="flex justify-center">
-            <div
-              className={`w-px h-12 sm:h-16 bg-gradient-to-b from-slate-400 to-transparent transition-all duration-500 ${animationPhase >= 4 ? "opacity-100" : "opacity-0"}`}
-            ></div>
-          </div>
+          {familyTree.children.length > 0 && (
+            <div className="flex justify-center">
+              <div
+                className={`w-px h-12 sm:h-16 bg-gradient-to-b from-slate-400 to-transparent transition-all duration-500 ${animationPhase >= 4 ? "opacity-100" : "opacity-0"}`}
+              ></div>
+            </div>
+          )}
 
           {/* Children */}
-          <div className="text-center">
-            <h3 className="text-xl sm:text-2xl font-serif text-slate-300 mb-6 sm:mb-8">Children</h3>
-            <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-8">
-              {[
-                { name: "Sarah Johnson", detail: "Daughter", birth: "Born 1995", delay: "delay-0" },
-                { name: "Michael Johnson", detail: "Son", birth: "Born 1998", delay: "delay-200" },
-                { name: "Lisa Johnson", detail: "Daughter", birth: "Born 2001", delay: "delay-400" },
-              ].map((child, index) => (
-                <div
-                  key={index}
-                  className={`transition-all duration-700 ${child.delay} ${animationPhase >= 4 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-                >
-                  <Card className="bg-slate-700/30 border-slate-500/40 w-full sm:w-48 max-w-sm mx-auto">
-                    <CardContent className="p-4 sm:p-6 text-center">
-                      <div className="w-12 sm:w-16 h-12 sm:h-16 bg-slate-500/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                        <Users className="w-6 sm:w-8 h-6 sm:h-8 text-slate-400" />
-                      </div>
-                      <h4 className="text-slate-200 font-medium">{child.name}</h4>
-                      <p className="text-slate-300 text-sm">{child.detail}</p>
-                      <p className="text-slate-400 text-xs">{child.birth}</p>
-                    </CardContent>
-                  </Card>
-                </div>
-              ))}
-            </div>
-          </div>
+          {renderSection("Children", familyTree.children, "children", animationPhase >= 4)}
 
           {/* Siblings */}
-          <div className="text-center border-t border-slate-600/20 pt-6 sm:pt-8">
-            <h3 className="text-xl sm:text-2xl font-serif text-slate-300 mb-6 sm:mb-8">Siblings</h3>
-            <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-8">
-              <Card className="bg-slate-700/30 border-slate-500/40 w-full sm:w-48 max-w-sm mx-auto">
-                <CardContent className="p-4 sm:p-6 text-center">
-                  <div className="w-12 sm:w-16 h-12 sm:h-16 bg-slate-500/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                    <Users className="w-6 sm:w-8 h-6 sm:h-8 text-slate-400" />
-                  </div>
-                  <h4 className="text-slate-200 font-medium">Peter Williams</h4>
-                  <p className="text-slate-300 text-sm">Brother (Born 1962)</p>
-                </CardContent>
-              </Card>
-              <Card className="bg-slate-700/30 border-slate-500/40 w-full sm:w-48 max-w-sm mx-auto">
-                <CardContent className="p-4 sm:p-6 text-center">
-                  <div className="w-12 sm:w-16 h-12 sm:h-16 bg-slate-500/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                    <Users className="w-6 sm:w-8 h-6 sm:h-8 text-slate-400" />
-                  </div>
-                  <h4 className="text-slate-200 font-medium">Grace Williams</h4>
-                  <p className="text-slate-300 text-sm">Sister (Born 1968)</p>
-                </CardContent>
-              </Card>
+          {familyTree.siblings.length > 0 && (
+            <div className="border-t border-slate-600/20 pt-6 sm:pt-8">
+              {renderSection("Siblings", familyTree.siblings, "siblings", animationPhase >= 4)}
             </div>
-          </div>
+          )}
+
+          {/* Custom Relations */}
+          {familyTree.customRelations.length > 0 && (
+            <div className="border-t border-slate-600/20 pt-6 sm:pt-8">
+              {renderSection("Extended Family", familyTree.customRelations, "customRelations", animationPhase >= 4)}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="p-4 sm:p-6 border-t border-slate-600/20 text-center bg-slate-800/50 rounded-b-2xl">
           <p className="text-slate-300 italic">"Family is not an important thing, it's everything" - Amaia</p>
+          <p className="text-slate-400 text-xs mt-2">Family tree data synced in real-time from Firebase</p>
         </div>
       </div>
     </div>
